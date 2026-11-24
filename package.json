@@ -1,0 +1,1 @@
+{"name":"lofspace","private":true,"scripts":{"install:app":"npm install --prefix server && npm install --prefix client","predev":"npm run install:app","dev":"concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"","build":"npm run build --prefix client","start:server":"npm run start --prefix server"},"devDependencies":{"concurrently":"^9.1.2"}}

@@ -1,0 +1,449 @@
+{
+  "info": {
+    "name": "LofiSpace REST API",
+    "description": "Authenticated LofiSpace API. Run Auth > Sign in to save an access token before calling protected routes.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001"
+    },
+    {
+      "key": "taskId",
+      "value": "1"
+    },
+    {
+      "key": "journalId",
+      "value": "1"
+    },
+    {
+      "key": "soundtrackId",
+      "value": "1"
+    },
+    {
+      "key": "sessionId",
+      "value": "1"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Create account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/signup",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"Your Name\",\n  \"email\": \"you@example.com\",\n  \"password\": \"change-this-password\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.data && body.data.session) {",
+                  "  pm.collectionVariables.set(\"accessToken\", body.data.session.access_token);",
+                  "  pm.collectionVariables.set(\"refreshToken\", body.data.session.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sign in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"you@example.com\",\n  \"password\": \"change-this-password\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.data && body.data.session) {",
+                  "  pm.collectionVariables.set(\"accessToken\", body.data.session.access_token);",
+                  "  pm.collectionVariables.set(\"refreshToken\", body.data.session.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/refresh",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.data && body.data.session) {",
+                  "  pm.collectionVariables.set(\"accessToken\", body.data.session.access_token);",
+                  "  pm.collectionVariables.set(\"refreshToken\", body.data.session.refresh_token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Current account",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/me"
+          }
+        },
+        {
+          "name": "Log out",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/logout",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset(\"accessToken\");",
+                  "pm.collectionVariables.unset(\"refreshToken\");"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/health",
+        "auth": {
+          "type": "noauth"
+        }
+      }
+    },
+    {
+      "name": "Tasks",
+      "item": [
+        {
+          "name": "List tasks",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/tasks"
+          }
+        },
+        {
+          "name": "Get task",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/tasks/{{taskId}}"
+          }
+        },
+        {
+          "name": "Create task",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Read a chapter\",\n  \"description\": \"Read and take a few notes.\",\n  \"priority\": \"medium\",\n  \"target_minutes\": 25,\n  \"completed\": false\n}"
+            },
+            "url": "{{baseUrl}}/api/tasks"
+          }
+        },
+        {
+          "name": "Update task",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Read a chapter\",\n  \"description\": \"Updated notes\",\n  \"priority\": \"high\",\n  \"target_minutes\": 30,\n  \"completed\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/tasks/{{taskId}}"
+          }
+        },
+        {
+          "name": "Delete task",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/tasks/{{taskId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Journals",
+      "item": [
+        {
+          "name": "List journals",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/journals"
+          }
+        },
+        {
+          "name": "Get journal",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/journals/{{journalId}}"
+          }
+        },
+        {
+          "name": "Create journal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"task_id\": 1,\n  \"title\": \"A focused morning\",\n  \"duration_minutes\": 25,\n  \"reflection\": \"Finished the first section.\"\n}"
+            },
+            "url": "{{baseUrl}}/api/journals"
+          }
+        },
+        {
+          "name": "Update journal",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"A focused morning\",\n  \"duration_minutes\": 30,\n  \"reflection\": \"Made good progress.\"\n}"
+            },
+            "url": "{{baseUrl}}/api/journals/{{journalId}}"
+          }
+        },
+        {
+          "name": "Delete journal",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/journals/{{journalId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Soundtracks",
+      "item": [
+        {
+          "name": "List soundtracks",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/soundtracks"
+          }
+        },
+        {
+          "name": "Get soundtrack",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/soundtracks/{{soundtrackId}}"
+          }
+        },
+        {
+          "name": "Create soundtrack",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ocean hush\",\n  \"category\": \"Nature\",\n  \"description\": \"A gentle seaside ambience.\",\n  \"url\": \"https://example.com/ocean.mp3\",\n  \"favorite\": false\n}"
+            },
+            "url": "{{baseUrl}}/api/soundtracks"
+          }
+        },
+        {
+          "name": "Update soundtrack",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"favorite\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/soundtracks/{{soundtrackId}}"
+          }
+        },
+        {
+          "name": "Delete soundtrack",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/soundtracks/{{soundtrackId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "Get profile",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/profile"
+          }
+        },
+        {
+          "name": "Update profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"Little Dreamer\",\n  \"bio\": \"Making a little progress every day.\",\n  \"avatar\": \"🌙\"\n}"
+            },
+            "url": "{{baseUrl}}/api/profile"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Focus sessions",
+      "item": [
+        {
+          "name": "List focus sessions",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/focus-sessions"
+          }
+        },
+        {
+          "name": "Get focus session",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/focus-sessions/{{sessionId}}"
+          }
+        },
+        {
+          "name": "Create focus session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"task_id\": 1,\n  \"duration_minutes\": 25,\n  \"started_at\": \"2026-11-23T09:00:00\",\n  \"ended_at\": \"2026-11-23T09:25:00\"\n}"
+            },
+            "url": "{{baseUrl}}/api/focus-sessions"
+          }
+        },
+        {
+          "name": "Delete focus session",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/focus-sessions/{{sessionId}}"
+          }
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  }
+}
