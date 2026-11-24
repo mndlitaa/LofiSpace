@@ -83,3 +83,16 @@
 .auth-switch button{border:0;background:none;color:#a66d53;font-weight:900;text-decoration:underline}
 .profile-head-actions{display:flex;align-items:center;gap:9px}
 .profile-head-actions .compact{font-size:11px}
+
+
+/* Use the bottom bar as the primary navigation on every screen size. */
+.sidebar{display:none!important}
+.main{width:100%;max-width:1600px;margin:0 auto!important;padding:28px clamp(20px,4vw,60px) 108px!important}
+.mobile-head{height:56px;display:flex!important;align-items:center;justify-content:space-between;margin:0 0 20px}
+.bottom-nav{display:flex!important;position:fixed;z-index:20;left:0;right:0;bottom:0;min-height:76px;align-items:center;justify-content:center;gap:clamp(8px,3vw,42px);padding:9px 18px max(9px,env(safe-area-inset-bottom));background:#fffdf8;border-top:1px solid #eee9df;box-shadow:0 -5px 20px #26334a0c}
+.bn{display:grid;justify-items:center;align-content:center;gap:5px;min-width:88px;padding:7px 12px;border-radius:11px;color:#858b94;font-size:11px;font-weight:800;transition:color .18s,background .18s}
+.bn:hover{color:#26334a;background:#f7f4ec}
+.bn.active{color:#26334a;background:#fff3d1}
+.bn.active svg{stroke-width:2.5}
+@media(max-width:760px){.main{padding:0 17px 96px!important}.mobile-head{height:57px;margin-bottom:12px}.bottom-nav{justify-content:space-around;gap:3px;padding:7px 8px max(8px,env(safe-area-inset-bottom))}.bn{flex:1;min-width:0;padding:7px 2px;font-size:9px}}
+@media(max-width:390px){.main{padding-left:12px!important;padding-right:12px!important}.bn{font-size:8px}}
