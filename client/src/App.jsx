@@ -1,88 +1,1821 @@
-import React,{useEffect,useMemo,useRef,useState}from'react';import{Routes,Route,NavLink,Link,useNavigate,useParams}from'react-router-dom';import{House,CheckSquare,BookOpen,Music2,UserRound,Play,Pause,RotateCcw,SkipForward,Plus,Search,Trash2,Edit3,Heart,Volume2,Cloud,Sun,Wind,Flame,Coffee,Timer,ChevronLeft,Download,Headphones,Check, X}from'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Routes, Route, NavLink, Link, useNavigate, useParams } from 'react-router-dom';
+import {
+  House,
+  CheckSquare,
+  BookOpen,
+  Music2,
+  UserRound,
+  Play,
+  Pause,
+  RotateCcw,
+  SkipForward,
+  Plus,
+  Search,
+  Trash2,
+  Edit3,
+  Heart,
+  Volume2,
+  Cloud,
+  Sun,
+  Wind,
+  Flame,
+  Coffee,
+  Timer,
+  ChevronLeft,
+  Download,
+  Headphones,
+  Check,
+  X,
+} from 'lucide-react';
 
-const KEY='lofspace-v1',AUTH_KEY='lofspace-auth-v1',API=import.meta.env.VITE_API_URL||'http://localhost:3001/api';
-const starter={tasks:[{id:'t1',title:'Read a chapter',description:'Settle into the next chapter of my book.',priority:'medium',target_minutes:50,completed:false,created_at:new Date().toISOString()},{id:'t2',title:'Sketch new ideas',description:'A few loose concepts, no pressure.',priority:'low',target_minutes:25,completed:false,created_at:new Date().toISOString()}],journals:[],soundtracks:[{id:'rain',name:'Window Rain',category:'Nature',description:'Soft rain on a quiet afternoon.',url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',favorite:true},{id:'cafe',name:'Little Café',category:'Places',description:'A warm corner table and gentle bustle.',url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',favorite:false},{id:'fire',name:'Hearthside',category:'Nature',description:'A crackling fire for a slower evening.',url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',favorite:false},{id:'wind',name:'Meadow Wind',category:'Nature',description:'A breeze through open windows.',url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',favorite:false},{id:'night',name:'Blue Hour',category:'Night',description:'A mellow soundtrack for late focus.',url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',favorite:false}],profile:{username:'Little Dreamer',bio:'Making a little progress every day.',avatar:'🌙'}};
-function storageKey(userId){return userId?`${KEY}:${userId}`:KEY}
-function load(userId){try{let key=storageKey(userId),raw=localStorage.getItem(key);if(!raw&&userId){raw=localStorage.getItem(KEY);if(raw){localStorage.setItem(key,raw);localStorage.removeItem(KEY)}}return{...starter,...JSON.parse(raw||'{}')}}catch{return starter}}
-function save(s,userId){localStorage.setItem(storageKey(userId),JSON.stringify(s))}
-function readSession(){try{return JSON.parse(localStorage.getItem(AUTH_KEY)||'null')}catch{return null}}
-function writeSession(session){localStorage.setItem(AUTH_KEY,JSON.stringify(session))}
-function clearSession(){localStorage.removeItem(AUTH_KEY)}
-async function api(path,opts={}){try{let session=readSession();const send=current=>fetch(API+path,{...opts,headers:{'Content-Type':'application/json',...(opts.headers||{}),...(current?.access_token?{Authorization:`Bearer ${current.access_token}`}:{})}});let r=await send(session);if(r.status===401&&session?.refresh_token&&!['/auth/login','/auth/signup','/auth/refresh'].includes(path)){let refresh=await fetch(API+'/auth/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:session.refresh_token})});if(refresh.ok){let refreshed=(await refresh.json()).data;writeSession(refreshed.session);session=refreshed.session;r=await send(session)}else clearSession()}if(!r.ok)throw Error('API '+r.status);let j=await r.json();return j.data??j}catch{return null}}
-const nav=[['/',House,'Focus'],['/tasks',CheckSquare,'Targets'],['/journal',BookOpen,'Journal'],['/sounds',Music2,'Sounds'],['/profile',UserRound,'Profile']];
-function App(){const[data,setData]=useState(()=>load()),[account,setAccount]=useState(null),[authReady,setAuthReady]=useState(false),[active,setActive]=useState(''),[mode,setMode]=useState('focus'),[seconds,setSeconds]=useState(25*60),[timer,setTimer]=useState(()=>{try{return JSON.parse(localStorage.getItem('lof-timer'))||null}catch{return null}}),[sound,setSound]=useState(''),[playing,setPlaying]=useState(false),[volume,setVolume]=useState(.35),[installEvt,setInstallEvt]=useState(null);const audio=useRef(null);const update=(fn)=>setData(d=>{let n=fn({...d});if(account)save(n,account.id);return n});
- useEffect(()=>{let alive=true;(async()=>{if(!readSession()?.access_token){if(alive)setAuthReady(true);return}const user=await api('/auth/me');if(!alive)return;if(user){setAccount(user);setData(load(user.id));setActive('')}else clearSession();setAuthReady(true)})();return()=>{alive=false}},[]);
- useEffect(()=>{if(!account)return;let alive=true;(async()=>{const [tasks,journals,soundtracks,profile]=await Promise.all([api('/tasks'),api('/journals'),api('/soundtracks'),api('/profile')]);if(!alive)return;if(tasks||journals||soundtracks||profile){setData(d=>{let n={...d,...(tasks?{tasks}:{}),...(journals?{journals}:{}),...(soundtracks?{soundtracks}:{}),...(profile?{profile:{...d.profile,...profile}}:{})};save(n,account.id);return n});if(tasks?.length)setActive(tasks.find(t=>!t.completed)?.id||'')}})();return()=>{alive=false}},[account?.id]);
- useEffect(()=>{window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();setInstallEvt(e)})},[]);
- useEffect(()=>{if(timer?.end){let tick=()=>{let rem=Math.max(0,Math.ceil((timer.end-Date.now())/1000));setSeconds(rem);if(rem===0){setTimer(null);localStorage.removeItem('lof-timer');if(timer.mode==='focus'){let task=data.tasks.find(t=>t.id===timer.task);let entry={id:crypto.randomUUID(),title:'Focus session',task_id:timer.task||null,task_title:task?.title||'Unlinked session',duration_minutes:timer.duration,reflection:'',created_at:new Date().toISOString()};update(d=>({...d,journals:[entry,...d.journals]}));api('/focus-sessions',{method:'POST',body:JSON.stringify({task_id:entry.task_id,duration_minutes:entry.duration_minutes,ended_at:entry.created_at})});api('/journals',{method:'POST',body:JSON.stringify(entry)})}new AudioContext().resume?.().catch(()=>{});alert(timer.mode==='focus'?'Focus session complete! Take a little break.':'Break is over. Ready to focus?')}};tick();let id=setInterval(tick,500);return()=>clearInterval(id)}},[timer]);
- useEffect(()=>{if(audio.current){audio.current.volume=volume;if(sound&&audio.current.src!==sound)audio.current.src=sound;if(playing)audio.current.play().catch(()=>setPlaying(false));else audio.current.pause()}},[sound,playing,volume]);
- const handleAuthenticated=user=>{setData(load(user.id));setActive('');setAccount(user)};const handleLogout=async()=>{await api('/auth/logout',{method:'POST'});clearSession();localStorage.removeItem('lof-timer');setTimer(null);setPlaying(false);setAccount(null);setData(load())};
- const selected=data.tasks.find(t=>t.id===active&&!t.completed);const focusMinutes=taskId=>{const target=Number(data.tasks.find(t=>t.id===taskId)?.target_minutes);return Number.isFinite(target)&&target>0?target:25};const durationFor=(m,taskId=active)=>m==='focus'?focusMinutes(taskId):m==='short'?5:15;
- useEffect(()=>{if(!timer)setSeconds(durationFor(mode,active)*60)},[active,mode,data.tasks]);
- const begin=(m=mode,task=active)=>{let mins=durationFor(m,task),n={end:Date.now()+mins*60*1000,mode:m,task,duration:mins};setMode(m);setTimer(n);setSeconds(mins*60);localStorage.setItem('lof-timer',JSON.stringify(n))};const pause=()=>{if(timer){setSeconds(Math.max(0,Math.ceil((timer.end-Date.now())/1000)));setTimer(null);localStorage.removeItem('lof-timer')}};const resume=()=>{let mins=durationFor(mode,active),n={end:Date.now()+seconds*1000,mode,task:active,duration:mins};setTimer(n);localStorage.setItem('lof-timer',JSON.stringify(n))};const reset=()=>{pause();setSeconds(durationFor(mode,active)*60)};const switchMode=m=>{pause();setMode(m);setSeconds(durationFor(m,active)*60)};const remaining=timer?Math.max(0,Math.ceil((timer.end-Date.now())/1000)):seconds,ratio=1-remaining/((timer?.duration||durationFor(mode,active))*60);
- if(!authReady)return <div className="auth-loading">Opening your cozy nook…</div>;if(!account)return <AuthScreen onAuthenticated={handleAuthenticated}/>;
- return <div className="app-shell"><aside className="sidebar"><Link to="/" className="brand"><span className="brand-icon">✦</span><span>LofiSpace<small>your little focus nook</small></span></Link><div className="nav-caption">YOUR SPACE</div><nav>{nav.map(([to,Icon,label])=><NavLink key={to} to={to} end={to==='/'} className={({isActive})=>'nav-link '+(isActive?'active':'')}><Icon size={18}/>{label}</NavLink>)}</nav><Link to="/profile" className="sidebar-profile" aria-label={'Open profile for '+(data.profile.username||'Little Dreamer')}><span className={'sidebar-avatar frame-'+(data.profile.avatar_frame||'sunny')}>{data.profile.avatar||'🌙'}</span><span className="sidebar-profile-copy"><b>{data.profile.username||'Little Dreamer'}</b><small>View profile</small></span><UserRound className="sidebar-profile-icon" size={16}/></Link></aside><main className="main"><header className="mobile-head"><Link to="/" className="brand"><span className="brand-icon">✦</span><span>LofiSpace</span></Link><span className="date-pill">{new Date().toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})}</span></header><Routes><Route path="/" element={<Home data={data} selected={selected} active={active} setActive={setActive} mode={mode} switchMode={switchMode} begin={begin} pause={pause} resume={resume} running={!!timer} reset={reset} sessionDuration={durationFor(mode,active)} remaining={remaining} ratio={ratio} sound={sound} setSound={setSound} playing={playing} setPlaying={setPlaying} audio={audio}/>}/><Route path="/tasks" element={<Tasks data={data} update={update} begin={begin} setActive={setActive}/>}/><Route path="/tasks/:id" element={<TaskDetail data={data} update={update} begin={begin}/>}/><Route path="/journal" element={<Journal data={data}/>}/><Route path="/journal/:id" element={<JournalDetail data={data}/>}/><Route path="/sounds" element={<Sounds data={data} update={update} sound={sound} setSound={setSound} playing={playing} setPlaying={setPlaying} volume={volume} setVolume={setVolume} audio={audio}/>}/><Route path="/profile" element={<Profile data={data} update={update} installEvt={installEvt} onLogout={handleLogout}/>}/><Route path="*" element={<Home data={data} selected={selected} active={active} setActive={setActive} mode={mode} switchMode={switchMode} begin={begin} pause={pause} resume={resume} reset={reset} running={!!timer} sessionDuration={durationFor(mode,active)} remaining={remaining} ratio={ratio} sound={sound} setSound={setSound} playing={playing} setPlaying={setPlaying} audio={audio}/>}/></Routes><audio ref={audio} loop preload="none" onEnded={()=>{}}/><nav className="bottom-nav">{nav.map(([to,Icon,label])=><NavLink key={to} to={to} end={to==='/'} className={({isActive})=>isActive?'bn active':'bn'}><Icon size={19}/><span>{label}</span></NavLink>)}</nav></main></div>
+const KEY = 'lofspace-v1',
+  AUTH_KEY = 'lofspace-auth-v1',
+  API = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+const starter = {
+  tasks: [
+    {
+      id: 't1',
+      title: 'Read a chapter',
+      description: 'Settle into the next chapter of my book.',
+      priority: 'medium',
+      target_minutes: 50,
+      completed: false,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 't2',
+      title: 'Sketch new ideas',
+      description: 'A few loose concepts, no pressure.',
+      priority: 'low',
+      target_minutes: 25,
+      completed: false,
+      created_at: new Date().toISOString(),
+    },
+  ],
+  journals: [],
+  soundtracks: [
+    {
+      id: 'rain',
+      name: 'Window Rain',
+      category: 'Nature',
+      description: 'Soft rain on a quiet afternoon.',
+      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+      favorite: true,
+    },
+    {
+      id: 'cafe',
+      name: 'Little Café',
+      category: 'Places',
+      description: 'A warm corner table and gentle bustle.',
+      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+      favorite: false,
+    },
+    {
+      id: 'fire',
+      name: 'Hearthside',
+      category: 'Nature',
+      description: 'A crackling fire for a slower evening.',
+      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+      favorite: false,
+    },
+    {
+      id: 'wind',
+      name: 'Meadow Wind',
+      category: 'Nature',
+      description: 'A breeze through open windows.',
+      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+      favorite: false,
+    },
+    {
+      id: 'night',
+      name: 'Blue Hour',
+      category: 'Night',
+      description: 'A mellow soundtrack for late focus.',
+      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
+      favorite: false,
+    },
+  ],
+  profile: {
+    username: 'Little Dreamer',
+    bio: 'Making a little progress every day.',
+    avatar: '🌙',
+  },
+};
+
+function storageKey(userId) {
+  return userId ? `${KEY}:${userId}` : KEY;
 }
-function AuthScreen({onAuthenticated}){const[mode,setMode]=useState('login'),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[username,setUsername]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');async function submit(e){e.preventDefault();setError('');setNotice('');setBusy(true);try{const response=await fetch(API+(mode==='signup'?'/auth/signup':'/auth/login'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,username})});const payload=await response.json();if(!response.ok)throw Error(payload.error||'Could not connect to your account');const result=payload.data;if(result.needsEmailConfirmation){setMode('login');setNotice('Check your inbox to confirm your email, then sign in.');setPassword('');return}writeSession(result.session);onAuthenticated(result.user)}catch(e){setError(e.message||'Could not connect. Make sure the LofiSpace API is running.')}finally{setBusy(false)}}return <main className="auth-page"><section className="auth-card"><Link to="/" className="auth-brand"><span className="brand-icon">✦</span><span>LofiSpace<small>your little focus nook</small></span></Link><span className="eyebrow">A LITTLE SPACE FOR YOU</span><h1>{mode==='login'?'Welcome back':'Create your account'}</h1><p className="auth-intro">{mode==='login'?'Sign in to pick up where you left off.':'Your focus plans and progress will be saved to your account.'}</p>{error&&<p className="auth-message error">{error}</p>}{notice&&<p className="auth-message success">{notice}</p>}<form className="form-stack" onSubmit={submit}>{mode==='signup'&&<label>Display name<input required maxLength="80" value={username} onChange={e=>setUsername(e.target.value)} placeholder="Your name"/></label>}<label>Email<input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com"/></label><label>Password<input required type="password" minLength="8" autoComplete={mode==='login'?'current-password':'new-password'} value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters"/></label><button className="primary-button auth-submit" disabled={busy}>{busy?'Please wait…':mode==='login'?'Sign in':'Create account'}</button></form><p className="auth-switch">{mode==='login'?"New to LofiSpace?":"Already have an account?"} <button type="button" onClick={()=>{setMode(mode==='login'?'signup':'login');setError('');setNotice('')}}>{mode==='login'?'Create account':'Sign in'}</button></p></section></main>}
-function HedgehogPet(){const[showBubble,setShowBubble]=useState(false);const timer=useRef(null);function greet(){setShowBubble(true);clearTimeout(timer.current);timer.current=setTimeout(()=>setShowBubble(false),2400)}useEffect(()=>()=>clearTimeout(timer.current),[]);return <button type="button" className="hedgehog-pet" onClick={greet} aria-label="Sentuh landak untuk menyapa"><img className="hedgehog-art" src="/hedgehog-reference.png" alt="Landak pixel art"/>{showBubble&&<img className="pet-bubble" src="/bubble-chat.png" alt="Hello"/>}</button>}
-function PageHead({eyebrow,title,desc,action}){return <div className="page-head"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1>{desc&&<p>{desc}</p>}</div>{action}</div>}
-function Home({data,selected,active,setActive,mode,switchMode,begin,pause,resume,running,reset,sessionDuration,remaining,ratio,sound,setSound,playing,setPlaying,audio}){let mm=String(Math.floor(remaining/60)).padStart(2,'0'),ss=String(remaining%60).padStart(2,'0'),done=data.tasks.filter(t=>t.completed).length;return <><PageHead eyebrow="MONDAY, YOUR WAY" title="Find your focus." desc="A little calm for everything you want to do."/><div className="home-grid"><section className="room-card"><div className="room-sky"><img className="park-background" src="/focus-park.png" alt="Pixel-art park with blue sky and clouds"/><div className="room-scene"><HedgehogPet/></div></div><div className="room-bottom"><div className="room-greeting"><span>✦ YOUR FOCUS NOOK</span><h2>Make some space<br/>for what matters.</h2><p>Take a breath. You’re right where you need to be.</p></div><div className="now-playing"><div className="np-icon">♫</div><div><small>NOW PLAYING</small><b>{data.soundtracks.find(s=>s.url===sound)?.name||'Choose an ambience'}</b></div><button className="icon-button" aria-label="Toggle ambience" onClick={()=>setPlaying(!playing)}>{playing?<Pause size={17}/>:<Play size={17}/>}</button></div></div></section><section className="timer-card"><div className="timer-top"><span className="eyebrow">POMODORO TIMER</span><span className="live-dot">{mode==='focus'?'FOCUS':'BREAK'}</span></div><div className="mode-tabs">{[['focus','Focus'],['short','Short break'],['long','Long break']].map(([m,l])=><button key={m} className={mode===m?'selected':''} onClick={()=>switchMode(m)}>{l}</button>)}</div><div className="timer-dial" style={{'--progress':`${ratio*100}%`}}><div className="dial-inner"><span className="timer-time">{mm}:{ss}</span><span className="timer-label">{mode==='focus'?'TIME TO FOCUS':'TAKE A BREATHER'}</span></div></div><div className="timer-controls"><button className="primary-button" onClick={()=>running?pause():(remaining>0&&remaining<sessionDuration*60?resume():begin(mode))}>{running?<><Pause size={17}/> Pause</>:<><Play size={17} fill="currentColor"/> {remaining>0&&remaining<sessionDuration*60?'Resume':'Start focus'}</>}</button><button className="icon-button" aria-label="Reset timer" onClick={reset}><RotateCcw size={18}/></button><button className="icon-button" aria-label="Skip session" onClick={()=>switchMode(mode==='focus'?'short':'focus')}><SkipForward size={18}/></button></div><div className="linked-task"><span className="task-check">✓</span><div><small>FOCUSING ON</small><b>{selected?.title||'Pick a task to begin'}</b></div><Link to="/tasks" className="text-link">Change</Link></div></section></div><section className="below-grid"><div className="surface quick-stats"><div className="section-title"><div><span className="eyebrow">A LITTLE PROGRESS</span><h3>Today’s rhythm</h3></div><Link to="/journal" className="text-link">View journal →</Link></div><div className="stat-row"><div className="stat-box"><span className="stat-icon peach">◷</span><b>{data.journals.filter(j=>new Date(j.created_at).toDateString()===new Date().toDateString()).reduce((a,j)=>a+(+j.duration_minutes||25),0)}<small> min</small></b><span>focus time</span></div><div className="stat-box"><span className="stat-icon mint">✦</span><b>{data.journals.filter(j=>new Date(j.created_at).toDateString()===new Date().toDateString()).length}</b><span>sessions</span></div><div className="stat-box"><span className="stat-icon lilac">✓</span><b>{done}<small> / {data.tasks.length}</small></b><span>tasks done</span></div></div></div><div className="surface task-peek"><div className="section-title"><div><span className="eyebrow">YOUR INTENTIONS</span><h3>Up next</h3></div><Link to="/tasks" className="round-add"><Plus size={17}/></Link></div>{data.tasks.filter(t=>!t.completed).slice(0,3).map(t=><button className="peek-task" key={t.id} onClick={()=>setActive(t.id)}><span className={'check-circle '+(active===t.id?'chosen':'')}>{active===t.id?'✓':''}</span><span>{t.title}</span><small>{t.target_minutes}m</small></button>)}{!data.tasks.some(t=>!t.completed)&&<p className="empty-inline">All done for today ✨</p>}</div></section></>}
-function Tasks({data,update,begin,setActive}){const[q,setQ]=useState(''),[filter,setFilter]=useState('all'),[form,setForm]=useState(null);const nav=useNavigate();const filtered=data.tasks.filter(t=>(t.title+' '+(t.description||'')).toLowerCase().includes(q.toLowerCase())&&(filter==='all'||(filter==='open'?!t.completed:t.completed)));async function saveTask(e){e.preventDefault();let t={...form,title:form.title.trim(),target_minutes:+form.target_minutes||25};if(!t.title)return;if(form.id){update(d=>({...d,tasks:d.tasks.map(x=>x.id===t.id?t:x)}));api('/tasks/'+t.id,{method:'PUT',body:JSON.stringify(t)})}else{t={...t,id:crypto.randomUUID(),completed:false,created_at:new Date().toISOString()};let created=await api('/tasks',{method:'POST',body:JSON.stringify(t)});if(created?.id)t.id=created.id;update(d=>({...d,tasks:[t,...d.tasks]}))}setActive(t.id);setForm(null)}function toggle(t){let n={...t,completed:!t.completed};update(d=>({...d,tasks:d.tasks.map(x=>x.id===t.id?n:x)}));api('/tasks/'+t.id,{method:'PUT',body:JSON.stringify(n)})}function del(t){update(d=>({...d,tasks:d.tasks.filter(x=>x.id!==t.id)}));api('/tasks/'+t.id,{method:'DELETE'})}return <><PageHead eyebrow="SMALL STEPS ADD UP" title="Focus targets" desc="Give your attention somewhere kind to land." action={<button className="primary-button compact" onClick={()=>setForm({title:'',description:'',priority:'medium',target_minutes:25})}><Plus size={16}/> New target</button>}/><div className="surface task-board"><div className="task-toolbar"><div className="searchbox"><Search size={17}/><input placeholder="Find a target..." value={q} onChange={e=>setQ(e.target.value)}/></div><div className="filter-pills">{[['all','All'],['open','In progress'],['done','Completed']].map(([f,l])=><button className={filter===f?'active':''} onClick={()=>setFilter(f)} key={f}>{l}</button>)}</div></div><div className="progress-line"><span>{data.tasks.filter(t=>t.completed).length} of {data.tasks.length} intentions complete</span><div><i style={{width:(data.tasks.length?data.tasks.filter(t=>t.completed).length/data.tasks.length*100:0)+'%'}}/></div></div>{filtered.length?filtered.map(t=><article className={'task-row '+(t.completed?'is-done':'')} key={t.id}><button className={'check-circle large '+(t.completed?'chosen':'')} onClick={()=>toggle(t)}>{t.completed?'✓':''}</button><button className="task-main" onClick={()=>nav('/tasks/'+t.id)}><b>{t.title}</b><span>{t.description||'No notes yet'}</span></button><span className={'priority '+t.priority}>{t.priority}</span><span className="duration-chip"><Timer size={14}/>{t.target_minutes}m</span><button className="icon-button row-action" aria-label="Edit" onClick={()=>setForm({...t})}><Edit3 size={16}/></button><button className="icon-button row-action" aria-label="Delete" onClick={()=>del(t)}><Trash2 size={16}/></button><button className="start-chip" onClick={()=>{setActive(t.id);begin('focus',t.id);nav('/')}}><Play size={14}/></button></article>):<div className="empty-state"><span>🌿</span><h3>{q?'No matching targets':'A clear little slate'}</h3><p>{q?'Try another search.':'Add a focus target to make a gentle plan for today.'}</p></div>}</div>{form&&<Modal title={form.id?'Edit target':'A new intention'} close={()=>setForm(null)}><form onSubmit={saveTask} className="form-stack"><label>Title<input required maxLength="120" autoFocus value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="What would you like to focus on?"/></label><label>Notes<textarea rows="3" value={form.description||''} onChange={e=>setForm({...form,description:e.target.value})} placeholder="A little more detail..."/></label><div className="form-two"><label>Priority<select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})}><option>low</option><option>medium</option><option>high</option></select></label><label>Target minutes<input type="number" min="5" max="600" value={form.target_minutes} onChange={e=>setForm({...form,target_minutes:e.target.value})}/><small className="field-hint">This sets the focus timer length for this task.</small></label></div><button className="primary-button">Save target</button></form></Modal>}</>}
-function Modal({title,close,children}){return <div className="modal-shade" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="modal"><div className="modal-head"><h2>{title}</h2><button className="icon-button" onClick={close}><X size={18}/></button></div>{children}</div></div>}
-function TaskDetail({data,update,begin}){const{id}=useParams(),t=data.tasks.find(x=>x.id===id),nav=useNavigate();if(!t)return <div className="empty-state"><h2>That target wandered off.</h2><Link to="/tasks">Back to targets</Link></div>;return <><Link to="/tasks" className="back-link"><ChevronLeft size={16}/> All targets</Link><PageHead eyebrow="YOUR INTENTION" title={t.title} desc={t.description||'A little progress, at your own pace.'} action={<button className="primary-button compact" onClick={()=>{begin('focus',t.id);nav('/')}}><Play size={15}/> Start focus</button>}/><div className="surface detail-card"><div className="detail-hero">✦</div><div className="detail-grid"><div><small>STATUS</small><b>{t.completed?'Completed':'In progress'}</b></div><div><small>PRIORITY</small><b className={'priority '+t.priority}>{t.priority}</b></div><div><small>TARGET FOCUS</small><b>{t.target_minutes} minutes</b></div><div><small>CREATED</small><b>{new Date(t.created_at).toLocaleDateString()}</b></div></div><div className="detail-actions"><button className="secondary-button" onClick={()=>{let title=prompt('Target title',t.title);if(title===null||!title.trim())return;let description=prompt('Notes',t.description||'');if(description===null)return;let changed={...t,title:title.trim(),description};update(d=>({...d,tasks:d.tasks.map(x=>x.id===id?changed:x)}));api('/tasks/'+id,{method:'PUT',body:JSON.stringify(changed)})}}><Edit3 size={15}/> Edit target</button><button className="secondary-button" onClick={()=>{let changed={...t,completed:!t.completed};update(d=>({...d,tasks:d.tasks.map(x=>x.id===id?changed:x)}));api('/tasks/'+id,{method:'PUT',body:JSON.stringify(changed)})}}>{t.completed?'Mark in progress':'Mark complete'}</button><button className="secondary-button" onClick={()=>{if(confirm('Delete this focus target?')){update(d=>({...d,tasks:d.tasks.filter(x=>x.id!==id)}));api('/tasks/'+id,{method:'DELETE'});nav('/tasks')}}}><Trash2 size={16}/> Delete target</button></div></div></>}
-function Journal({data}){const[q,setQ]=useState(''),[date,setDate]=useState(''),items=data.journals.filter(j=>(!date||new Date(j.created_at).toISOString().slice(0,10)===date)&&((j.title||'')+' '+(j.task_title||'')+' '+(j.reflection||'')).toLowerCase().includes(q.toLowerCase())).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));return <><PageHead eyebrow="A RECORD OF SHOWING UP" title="Focus journal" desc="Every focused minute is worth remembering."/><div className="surface journal-board"><div className="searchbox journal-search"><Search size={17}/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search your sessions..."/></div><label className="date-filter">On date <input type="date" value={date} onChange={e=>setDate(e.target.value)}/></label>{items.length?items.map(j=><Link className="journal-entry" key={j.id} to={'/journal/'+j.id}><div className="journal-stamp">✦</div><div className="journal-copy"><small>{new Date(j.created_at).toLocaleString(undefined,{weekday:'long',month:'long',day:'numeric',hour:'numeric',minute:'2-digit'})}</small><b>{j.title||'Focus session'}</b><span>{j.task_title||'Quiet focus'}{j.reflection?' · '+j.reflection:''}</span></div><span className="duration-chip"><Timer size={14}/>{j.duration_minutes||25}m</span><ChevronLeft className="journal-chevron" size={18}/></Link>):<div className="empty-state"><span>📖</span><h3>Your story starts here</h3><p>Complete a focus session and its little memory will appear here.</p><Link className="text-link" to="/">Go to the focus room →</Link></div>}</div></>}
-function JournalDetail({data}){
- const{id}=useParams(),[remote,setRemote]=useState(null),[loading,setLoading]=useState(true);
- const cached=data.journals.find(x=>String(x.id)===String(id));
- useEffect(()=>{let alive=true;setLoading(true);api('/journals/'+encodeURIComponent(id)).then(entry=>{if(alive)setRemote(entry)}).finally(()=>{if(alive)setLoading(false)});return()=>{alive=false}},[id]);
- const j=cached||remote;
- if(!j&&loading)return <div className="empty-state"><h2>Opening your session…</h2></div>;
- if(!j)return <div className="empty-state"><h2>Session not found.</h2><Link to="/journal">Back to journal</Link></div>;
- const minutes=Number(j.duration_minutes)||25;
- const targetTitle=j.task_title||data.tasks.find(t=>String(t.id)===String(j.task_id))?.title||'Independent focus';
- const when=new Date(j.created_at);
- return <><Link to="/journal" className="back-link"><ChevronLeft size={16}/> Focus journal</Link><PageHead eyebrow="A MOMENT YOU MADE" title={j.title||'Focus session'} desc={when.toLocaleString(undefined,{dateStyle:'full',timeStyle:'short'})}/><div className="surface journal-detail"><div className="journal-big-icon">📔</div><div className="journal-facts"><div><small>FOCUS DURATION</small><b>{minutes} minutes</b></div><div><small>ASSOCIATED TARGET</small><b>{targetTitle}</b></div><div><small>SESSION SUMMARY</small><p>You set aside {minutes} focused {minutes===1?'minute':'minutes'} for {targetTitle.toLowerCase()}. Every completed session is a step forward.</p></div><div><small>REFLECTION</small><p>{j.reflection?.trim()||'No reflection was added for this session.'}</p></div></div></div></>;
+
+function load(userId) {
+  try {
+    let key = storageKey(userId),
+      raw = localStorage.getItem(key);
+    if (!raw && userId) {
+      raw = localStorage.getItem(KEY);
+      if (raw) {
+        localStorage.setItem(key, raw);
+        localStorage.removeItem(KEY);
+      }
+    }
+    return { ...starter, ...JSON.parse(raw || '{}') };
+  } catch {
+    return starter;
+  }
 }
-function Sounds({data,update,sound,setSound,playing,setPlaying,volume,setVolume,audio}){
- const[c,setC]=useState('All'),[busy,setBusy]=useState(false),[uploadMessage,setUploadMessage]=useState('');
- useEffect(()=>{let alive=true;api('/soundtracks').then(rows=>{if(!alive||!Array.isArray(rows))return;update(d=>({...d,soundtracks:rows}));if(sound&&!rows.some(track=>track.url===sound)){setPlaying(false);setSound('')}});return()=>{alive=false}},[]);
- const cats=['All',...new Set(data.soundtracks.map(x=>x.category))],tracks=data.soundtracks.filter(s=>c==='All'||s.category===c);
- async function uploadTrack(e){
-  const file=e.target.files?.[0];if(!file)return;
-  if(!file.name.toLowerCase().endsWith('.mp3')){setUploadMessage('Choose an MP3 file.');e.target.value='';return}
-  if(file.size>25*1024*1024){setUploadMessage('This track is over the 25 MB limit.');e.target.value='';return}
-  setBusy(true);setUploadMessage('Uploading your track…');
-  const title=file.name.replace(/\.mp3$/i,'').replace(/[_-]+/g,' ').trim();
-  const query=new URLSearchParams({filename:file.name,title});
-  try{
-   const response=await fetch(`${API}/soundtracks/upload?${query}`,{method:'POST',headers:{'Content-Type':file.type||'audio/mpeg',...(readSession()?.access_token?{Authorization:'Bearer '+readSession().access_token}:{})},body:file});
-   const payload=await response.json();if(!response.ok)throw new Error(payload.error||'Upload failed. Check the API connection.');
-   update(d=>({...d,soundtracks:[payload.data,...d.soundtracks]}));setSound(payload.data.url);setPlaying(true);setUploadMessage(`${payload.data.name} added to your vault.`);
-  }catch(error){setUploadMessage(error.message||'Upload failed. Check your Supabase connection.')}
-  finally{setBusy(false);e.target.value=''}
- }
- return <>
-  <PageHead eyebrow="SET THE MOOD" title="Soundtrack vault" desc="A soft backdrop for whatever you’re working on." action={<label className={'primary-button compact upload-control '+(busy?'disabled':'')}><Plus size={16}/>{busy?'Uploading…':'Add MP3'}<input type="file" accept=".mp3,audio/mpeg" onChange={uploadTrack} disabled={busy}/></label>}/>
-  {uploadMessage&&<p className="upload-message">{uploadMessage}</p>}
-  <div className="sound-player surface"><div className="record-disc">♫</div><div className="sound-playing"><small>NOW PLAYING</small><h3>{data.soundtracks.find(x=>x.url===sound)?.name||'Pick your atmosphere'}</h3><span>{data.soundtracks.find(x=>x.url===sound)?.description||'A little sound can make the room feel right.'}</span></div><button className="play-round" aria-label="Play or pause" onClick={()=>setPlaying(!playing)}>{playing?<Pause size={20}/>:<Play size={20} fill="currentColor"/>}</button><label className="volume"><Volume2 size={17}/><input type="range" min="0" max="1" step=".01" value={volume} onChange={e=>setVolume(+e.target.value)}/></label></div>
-  <div className="sound-categories">{cats.map(x=><button key={x} className={c===x?'active':''} onClick={()=>setC(x)}>{x}</button>)}<span className="category-spacer"/><Heart size={15}/>{data.soundtracks.filter(s=>s.favorite).length} saved</div>
-  <div className="sound-grid">{tracks.map((s,i)=><article className={'sound-card tint-'+i%5} key={s.id}><button className={'favorite '+(s.favorite?'favorited':'')} aria-label="Toggle favorite" onClick={()=>{let favorite=!s.favorite;update(d=>({...d,soundtracks:d.soundtracks.map(x=>x.id===s.id?{...x,favorite}:x)}));api('/soundtracks/'+s.id,{method:'PUT',body:JSON.stringify({...s,favorite})})}}><Heart size={17} fill={s.favorite?'currentColor':'none'}/></button><div className="sound-art">{s.category==='Places'?'☕':s.category==='Night'?'🌙':s.category==='My music'?'🎧':i%2?'🔥':'🌧️'}<span className="art-stars">✦　·　✧</span></div><div className="sound-card-copy"><small>{s.category.toUpperCase()}</small><h3>{s.name}</h3><p>{s.description}</p><button className={'listen-button '+(sound===s.url&&playing?'is-playing':'')} onClick={()=>{if(sound===s.url){setPlaying(!playing)}else{setSound(s.url);setPlaying(true)}}}>{sound===s.url&&playing?<><Pause size={14}/> Pause</>:<><Play size={14}/> Play sound</>}</button></div></article>)}</div>
-  <p className="audio-note"><Headphones size={14}/> Add MP3 files up to 25 MB. Tracks upload to your Supabase Storage vault.</p>
- </>
+
+function save(s, userId) {
+  localStorage.setItem(storageKey(userId), JSON.stringify(s));
 }
-const profileAvatars=['🌙','🌱','🦔','☁️','🐸','🐻','🍓','🌼'];
-const profileFrames=[['sunny','Sunshine'],['sky','Sky'],['mint','Mint'],['lavender','Lavender'],['peach','Peach']];
-function Profile({data,update,installEvt,onLogout}){
- const[editing,setEditing]=useState(false),[draft,setDraft]=useState(null),[saving,setSaving]=useState(false),[notice,setNotice]=useState('');
- const profile=data.profile||{};let sessions=data.journals.length,minutes=data.journals.reduce((a,j)=>a+(+j.duration_minutes||25),0),tasks=data.tasks.filter(t=>t.completed).length;
- function openEditor(){setDraft({username:profile.username||'Little Dreamer',bio:profile.bio||'',avatar:profile.avatar||'🌙',avatar_frame:profile.avatar_frame||'sunny'});setNotice('');setEditing(true)}
- async function saveProfile(e){e.preventDefault();if(!draft?.username.trim())return;setSaving(true);const changed={...draft,username:draft.username.trim()};update(d=>({...d,profile:{...d.profile,...changed}}));const saved=await api('/profile',{method:'PUT',body:JSON.stringify({username:changed.username,bio:changed.bio,avatar:changed.avatar,avatar_frame:changed.avatar_frame})});if(saved)update(d=>({...d,profile:{...d.profile,...saved,avatar_frame:changed.avatar_frame}}));setSaving(false);setEditing(false);setNotice(saved?'Profile saved.':'Saved on this device. It will sync when the API is available.')}
- return <>
-  <PageHead eyebrow="A LITTLE ABOUT YOU" title="Your profile" desc="Look how far you’ve already come." action={<div className="profile-head-actions"><button className="secondary-button compact" onClick={onLogout}>Log out</button><button className="primary-button compact" onClick={openEditor}><Edit3 size={15}/> Edit profile</button></div>}/>
-  {notice&&<p className="profile-notice">{notice}</p>}
-  <div className="profile-layout"><div className="profile-id surface"><div className="id-top"><span>LOFISPACE / MEMBER CARD</span><span>NO. 0001</span></div><div className={'avatar-pixel frame-'+(profile.avatar_frame||'sunny')}>{profile.avatar||'🌙'}</div><div className="id-name">{profile.username||'Little Dreamer'}</div><p className="id-bio">{profile.bio||'Making a little progress every day.'}</p><div className="id-stats"><div><b>{sessions}</b><small>SESSIONS</small></div><div><b>{(minutes/60).toFixed(1)}</b><small>FOCUS HOURS</small></div><div><b>{tasks}</b><small>TASKS DONE</small></div></div></div><div className="profile-right"><div className="surface profile-settings"><span className="eyebrow">YOUR LITTLE CORNER</span><h3>About LofiSpace</h3><p>LofiSpace is a cozy productivity nook for focused work, gentle breaks, and noticing your progress. Make a plan, find an atmosphere, and take things one pomodoro at a time.</p><div className="profile-facts"><span>✦&nbsp; Built for gentle focus</span><span>☁&nbsp; Your profile syncs with Supabase</span><span>♫&nbsp; Your personal music collection</span></div></div><div className="surface install-card"><div className="install-icon"><Download size={20}/></div><div><h3>Take your nook with you</h3><p>Install LofiSpace on your device for a cozy, app-like experience.</p></div><button className="secondary-button" disabled={!installEvt} onClick={async()=>{if(installEvt){installEvt.prompt();await installEvt.userChoice}}}>{installEvt?'Install app':'Use browser menu'}</button></div></div></div>
-  {editing&&<Modal title="Make it yours" close={()=>setEditing(false)}><form className="form-stack profile-form" onSubmit={saveProfile}><label>Display name<input autoFocus maxLength="80" required value={draft.username} onChange={e=>setDraft({...draft,username:e.target.value})} placeholder="Your name"/></label><label>A little bio<textarea rows="3" maxLength="500" value={draft.bio} onChange={e=>setDraft({...draft,bio:e.target.value})} placeholder="Something about you..."/></label><div className="picker-group"><span className="picker-label">Choose your avatar</span><div className="avatar-options">{profileAvatars.map(icon=><button type="button" key={icon} className={'avatar-option '+(draft.avatar===icon?'selected':'')} aria-label={'Choose '+icon+' avatar'} onClick={()=>setDraft({...draft,avatar:icon})}>{icon}</button>)}</div></div><div className="picker-group"><span className="picker-label">Choose a picture frame</span><div className="frame-options">{profileFrames.map(([frame,label])=><button type="button" key={frame} className={'frame-choice '+(draft.avatar_frame===frame?'selected':'')} onClick={()=>setDraft({...draft,avatar_frame:frame})}><span className={'frame-preview frame-'+frame}>{draft.avatar}</span><span>{label}</span></button>)}</div></div><button className="primary-button" disabled={saving}>{saving?'Saving…':'Save profile'}</button></form></Modal>}
- </>
+
+function readSession() {
+  try {
+    return JSON.parse(localStorage.getItem(AUTH_KEY) || 'null');
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(session) {
+  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+}
+
+function clearSession() {
+  localStorage.removeItem(AUTH_KEY);
+}
+
+async function api(path, opts = {}) {
+  try {
+    let session = readSession();
+    const send = (current) =>
+      fetch(API + path, {
+        ...opts,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(opts.headers || {}),
+          ...(current?.access_token ? { Authorization: `Bearer ${current.access_token}` } : {}),
+        },
+      });
+    let r = await send(session);
+    if (r.status === 401 && session?.refresh_token && !['/auth/login', '/auth/signup', '/auth/refresh'].includes(path)) {
+      let refresh = await fetch(API + '/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: session.refresh_token }),
+      });
+      if (refresh.ok) {
+        let refreshed = (await refresh.json()).data;
+        writeSession(refreshed.session);
+        session = refreshed.session;
+        r = await send(session);
+      } else clearSession();
+    }
+    if (!r.ok) throw Error('API ' + r.status);
+    let j = await r.json();
+    return j.data ?? j;
+  } catch {
+    return null;
+  }
+}
+
+const nav = [
+  ['/', House, 'Focus'],
+  ['/tasks', CheckSquare, 'Targets'],
+  ['/journal', BookOpen, 'Journal'],
+  ['/sounds', Music2, 'Sounds'],
+  ['/profile', UserRound, 'Profile'],
+];
+
+function App() {
+  const [data, setData] = useState(() => load()),
+    [account, setAccount] = useState(null),
+    [authReady, setAuthReady] = useState(false),
+    [active, setActive] = useState(''),
+    [mode, setMode] = useState('focus'),
+    [seconds, setSeconds] = useState(25 * 60),
+    [timer, setTimer] = useState(() => {
+      try {
+        return JSON.parse(localStorage.getItem('lof-timer')) || null;
+      } catch {
+        return null;
+      }
+    }),
+    [sound, setSound] = useState(''),
+    [playing, setPlaying] = useState(false),
+    [volume, setVolume] = useState(0.35),
+    [installEvt, setInstallEvt] = useState(null),
+    [notice, setNotice] = useState(null);
+  const audio = useRef(null);
+  const notify = (message, kind = 'success') => {
+    const id = Date.now();
+    setNotice({ message, kind, id });
+    window.setTimeout(() => setNotice((current) => current?.id === id ? null : current), 4000);
+  };
+  const update = (fn) =>
+    setData((d) => {
+      let n = fn({ ...d });
+      if (account) save(n, account.id);
+      return n;
+    });
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!readSession()?.access_token) {
+        if (alive) setAuthReady(true);
+        return;
+      }
+      const user = await api('/auth/me');
+      if (!alive) return;
+      if (user) {
+        setAccount(user);
+        setData(load(user.id));
+        setActive('');
+      } else clearSession();
+      setAuthReady(true);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!account) return;
+    let alive = true;
+    (async () => {
+      const [tasks, journals, soundtracks, profile] = await Promise.all([
+        api('/tasks'),
+        api('/journals'),
+        api('/soundtracks'),
+        api('/profile'),
+      ]);
+      if (!alive) return;
+      if (tasks || journals || soundtracks || profile) {
+        setData((d) => {
+          let n = {
+            ...d,
+            ...(tasks ? { tasks } : {}),
+            ...(journals ? { journals } : {}),
+            ...(soundtracks ? { soundtracks } : {}),
+            ...(profile ? { profile: { ...d.profile, ...profile } } : {}),
+          };
+          save(n, account.id);
+          return n;
+        });
+        if (tasks?.length) setActive(tasks.find((t) => !t.completed)?.id || '');
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [account?.id]);
+
+  useEffect(() => {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      setInstallEvt(e);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (timer?.end) {
+      let tick = () => {
+        let rem = Math.max(0, Math.ceil((timer.end - Date.now()) / 1000));
+        setSeconds(rem);
+        if (rem === 0) {
+          setTimer(null);
+          localStorage.removeItem('lof-timer');
+          if (timer.mode === 'focus') {
+            let task = data.tasks.find((t) => t.id === timer.task);
+            let entry = {
+              id: crypto.randomUUID(),
+              title: 'Focus session',
+              task_id: timer.task || null,
+              task_title: task?.title || 'Unlinked session',
+              duration_minutes: timer.duration,
+              reflection: '',
+              created_at: new Date().toISOString(),
+            };
+            update((d) => ({ ...d, journals: [entry, ...d.journals] }));
+            api('/focus-sessions', {
+              method: 'POST',
+              body: JSON.stringify({
+                task_id: entry.task_id,
+                duration_minutes: entry.duration_minutes,
+                ended_at: entry.created_at,
+              }),
+            });
+            api('/journals', { method: 'POST', body: JSON.stringify(entry) });
+            notify('Sesi berhasil disimpan ke jurnal.');
+          }
+          new AudioContext().resume?.().catch(() => {});
+          alert(timer.mode === 'focus' ? 'Focus session complete! Take a little break.' : 'Break is over. Ready to focus?');
+        }
+      };
+      tick();
+      let id = setInterval(tick, 500);
+      return () => clearInterval(id);
+    }
+  }, [timer]);
+
+  useEffect(() => {
+    if (audio.current) {
+      audio.current.volume = volume;
+      if (sound && audio.current.src !== sound) audio.current.src = sound;
+      if (playing) audio.current.play().catch(() => setPlaying(false));
+      else audio.current.pause();
+    }
+  }, [sound, playing, volume]);
+
+  const handleAuthenticated = (user) => {
+    setData(load(user.id));
+    setActive('');
+    setAccount(user);
+  };
+  const handleLogout = async () => {
+    await api('/auth/logout', { method: 'POST' });
+    clearSession();
+    localStorage.removeItem('lof-timer');
+    setTimer(null);
+    setPlaying(false);
+    setAccount(null);
+    setData(load());
+  };
+
+  const selected = data.tasks.find((t) => t.id === active && !t.completed);
+  const focusMinutes = (taskId) => {
+    const target = Number(data.tasks.find((t) => t.id === taskId)?.target_minutes);
+    return Number.isFinite(target) && target > 0 ? target : 25;
+  };
+  const durationFor = (m, taskId = active) => (m === 'focus' ? focusMinutes(taskId) : m === 'short' ? 5 : 15);
+
+  useEffect(() => {
+    if (!timer) setSeconds(durationFor(mode, active) * 60);
+  }, [active, mode, data.tasks]);
+
+  const begin = (m = mode, task = active) => {
+    let mins = durationFor(m, task),
+      n = { end: Date.now() + mins * 60 * 1000, mode: m, task, duration: mins };
+    setMode(m);
+    setTimer(n);
+    setSeconds(mins * 60);
+    localStorage.setItem('lof-timer', JSON.stringify(n));
+  };
+  const pause = () => {
+    if (timer) {
+      setSeconds(Math.max(0, Math.ceil((timer.end - Date.now()) / 1000)));
+      setTimer(null);
+      localStorage.removeItem('lof-timer');
+    }
+  };
+  const resume = () => {
+    let mins = durationFor(mode, active),
+      n = { end: Date.now() + seconds * 1000, mode, task: active, duration: mins };
+    setTimer(n);
+    localStorage.setItem('lof-timer', JSON.stringify(n));
+  };
+  const reset = () => {
+    pause();
+    setSeconds(durationFor(mode, active) * 60);
+  };
+  const switchMode = (m) => {
+    pause();
+    setMode(m);
+    setSeconds(durationFor(m, active) * 60);
+  };
+  const remaining = timer ? Math.max(0, Math.ceil((timer.end - Date.now()) / 1000)) : seconds,
+    ratio = 1 - remaining / ((timer?.duration || durationFor(mode, active)) * 60);
+
+  if (!authReady) return <div className="auth-loading">Opening your cozy nook…</div>;
+  if (!account) return <AuthScreen onAuthenticated={handleAuthenticated} />;
+
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <Link to="/" className="brand">
+          <span className="brand-icon">✦</span>
+          <span>
+            LofiSpace<small>your little focus nook</small>
+          </span>
+        </Link>
+        <div className="nav-caption">YOUR SPACE</div>
+        <nav>
+          {nav.map(([to, Icon, label]) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              className={({ isActive }) => 'nav-link ' + (isActive ? 'active' : '')}
+            >
+              <Icon size={18} />
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+        <Link
+          to="/profile"
+          className="sidebar-profile"
+          aria-label={'Open profile for ' + (data.profile.username || 'Little Dreamer')}
+        >
+          <span className={'sidebar-avatar frame-' + (data.profile.avatar_frame || 'sunny')}>
+            {data.profile.avatar || '🌙'}
+          </span>
+          <span className="sidebar-profile-copy">
+            <b>{data.profile.username || 'Little Dreamer'}</b>
+            <small>View profile</small>
+          </span>
+          <UserRound className="sidebar-profile-icon" size={16} />
+        </Link>
+      </aside>
+      <main className="main">
+        <header className="mobile-head">
+          <Link to="/" className="brand">
+            <span className="brand-icon">✦</span>
+            <span>LofiSpace</span>
+          </Link>
+          <span className="date-pill">
+            {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+          </span>
+        </header>
+        {notice && (
+          <div className={'page-notice ' + notice.kind} role="status" aria-live="polite">
+            <Check size={17} /> <span>{notice.message}</span>
+            <button className="notice-close" aria-label="Tutup notifikasi" onClick={() => setNotice(null)}><X size={15} /></button>
+          </div>
+        )}
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <Home
+                data={data}
+                selected={selected}
+                active={active}
+                setActive={setActive}
+                mode={mode}
+                switchMode={switchMode}
+                begin={begin}
+                pause={pause}
+                resume={resume}
+                running={!!timer}
+                reset={reset}
+                sessionDuration={durationFor(mode, active)}
+                remaining={remaining}
+                ratio={ratio}
+                sound={sound}
+                setSound={setSound}
+                playing={playing}
+                setPlaying={setPlaying}
+                audio={audio}
+              />
+            }
+          />
+          <Route
+            path="/tasks"
+            element={<Tasks data={data} update={update} begin={begin} setActive={setActive} notify={notify} />}
+          />
+          <Route
+            path="/tasks/:id"
+            element={<TaskDetail data={data} update={update} begin={begin} notify={notify} />}
+          />
+          <Route path="/journal" element={<Journal data={data} />} />
+          <Route path="/journal/:id" element={<JournalDetail data={data} />} />
+          <Route
+            path="/sounds"
+            element={
+              <Sounds
+                data={data}
+                update={update}
+                sound={sound}
+                setSound={setSound}
+                playing={playing}
+                setPlaying={setPlaying}
+                volume={volume}
+                setVolume={setVolume}
+                audio={audio}
+                notify={notify}
+              />
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+                <Profile data={data} update={update} installEvt={installEvt} onLogout={handleLogout} notify={notify} />
+            }
+          />
+          <Route
+            path="*"
+            element={
+              <Home
+                data={data}
+                selected={selected}
+                active={active}
+                setActive={setActive}
+                mode={mode}
+                switchMode={switchMode}
+                begin={begin}
+                pause={pause}
+                resume={resume}
+                running={!!timer}
+                reset={reset}
+                sessionDuration={durationFor(mode, active)}
+                remaining={remaining}
+                ratio={ratio}
+                sound={sound}
+                setSound={setSound}
+                playing={playing}
+                setPlaying={setPlaying}
+                audio={audio}
+              />
+            }
+          />
+        </Routes>
+        <audio ref={audio} loop preload="none" onEnded={() => {}} />
+        <nav className="bottom-nav">
+          {nav.map(([to, Icon, label]) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              className={({ isActive }) => (isActive ? 'bn active' : 'bn')}
+            >
+              <Icon size={19} />
+              <span>{label}</span>
+            </NavLink>
+          ))}
+        </nav>
+      </main>
+    </div>
+  );
+}
+
+function AuthScreen({ onAuthenticated }) {
+  const [mode, setMode] = useState('login'),
+    [email, setEmail] = useState(''),
+    [password, setPassword] = useState(''),
+    [username, setUsername] = useState(''),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(''),
+    [notice, setNotice] = useState('');
+
+  async function submit(e) {
+    e.preventDefault();
+    setError('');
+    setNotice('');
+    setBusy(true);
+    try {
+      const response = await fetch(API + (mode === 'signup' ? '/auth/signup' : '/auth/login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, username }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw Error(payload.error || 'Could not connect to your account');
+      const result = payload.data;
+      if (result.needsEmailConfirmation) {
+        setMode('login');
+        setNotice('Check your inbox to confirm your email, then sign in.');
+        setPassword('');
+        return;
+      }
+      writeSession(result.session);
+      onAuthenticated(result.user);
+    } catch (e) {
+      setError(e.message || 'Could not connect. Make sure the LofiSpace API is running.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="auth-page">
+      <section className="auth-card">
+        <Link to="/" className="auth-brand">
+          <span className="brand-icon">✦</span>
+          <span>
+            LofiSpace<small>your little focus nook</small>
+          </span>
+        </Link>
+        <span className="eyebrow">A LITTLE SPACE FOR YOU</span>
+        <h1>{mode === 'login' ? 'Welcome back' : 'Create your account'}</h1>
+        <p className="auth-intro">
+          {mode === 'login'
+            ? 'Sign in to pick up where you left off.'
+            : 'Your focus plans and progress will be saved to your account.'}
+        </p>
+        {error && <p className="auth-message error">{error}</p>}
+        {notice && <p className="auth-message success">{notice}</p>}
+        <form className="form-stack" onSubmit={submit}>
+          {mode === 'signup' && (
+            <label>
+              Display name
+              <input
+                required
+                maxLength="80"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Your name"
+              />
+            </label>
+          )}
+          <label>
+            Email
+            <input
+              required
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+            />
+          </label>
+          <label>
+            Password
+            <input
+              required
+              type="password"
+              minLength="8"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="At least 8 characters"
+            />
+          </label>
+          <button className="primary-button auth-submit" disabled={busy}>
+            {busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
+          </button>
+        </form>
+        <p className="auth-switch">
+          {mode === 'login' ? 'New to LofiSpace?' : 'Already have an account?'}{' '}
+          <button
+            type="button"
+            onClick={() => {
+              setMode(mode === 'login' ? 'signup' : 'login');
+              setError('');
+              setNotice('');
+            }}
+          >
+            {mode === 'login' ? 'Create account' : 'Sign in'}
+          </button>
+        </p>
+      </section>
+    </main>
+  );
+}
+
+function HedgehogPet() {
+  const [showBubble, setShowBubble] = useState(false);
+  const timer = useRef(null);
+  function greet() {
+    setShowBubble(true);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setShowBubble(false), 2400);
+  }
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return (
+    <button
+      type="button"
+      className="hedgehog-pet"
+      onClick={greet}
+      aria-label="Sentuh landak untuk menyapa"
+    >
+      <img className="hedgehog-art" src="/hedgehog-reference.png" alt="Landak pixel art" />
+      {showBubble && <img className="pet-bubble" src="/bubble-chat.png" alt="Hello" />}
+    </button>
+  );
+}
+
+function PageHead({ eyebrow, title, desc, action }) {
+  return (
+    <div className="page-head">
+      <div>
+        <div className="eyebrow">{eyebrow}</div>
+        <h1>{title}</h1>
+        {desc && <p>{desc}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function Home({
+  data,
+  selected,
+  active,
+  setActive,
+  mode,
+  switchMode,
+  begin,
+  pause,
+  resume,
+  running,
+  reset,
+  sessionDuration,
+  remaining,
+  ratio,
+  sound,
+  setSound,
+  playing,
+  setPlaying,
+  audio,
+}) {
+  let mm = String(Math.floor(remaining / 60)).padStart(2, '0'),
+    ss = String(remaining % 60).padStart(2, '0'),
+    done = data.tasks.filter((t) => t.completed).length;
+
+  return (
+    <>
+      <PageHead
+        eyebrow="MONDAY, YOUR WAY"
+        title="Find your focus."
+        desc="A little calm for everything you want to do."
+      />
+      <div className="home-grid">
+        <section className="room-card">
+          <div className="room-sky">
+            <img
+              className="park-background"
+              src="/focus-park.png"
+              alt="Pixel-art park with blue sky and clouds"
+            />
+            <div className="room-scene">
+              <HedgehogPet />
+            </div>
+          </div>
+          <div className="room-bottom">
+            <div className="room-greeting">
+              <span>✦ YOUR FOCUS NOOK</span>
+              <h2>
+                Make some space
+                <br />
+                for what matters.
+              </h2>
+              <p>Take a breath. You’re right where you need to be.</p>
+            </div>
+            <div className="now-playing">
+              <div className="np-icon">♫</div>
+              <div>
+                <small>NOW PLAYING</small>
+                <b>{data.soundtracks.find((s) => s.url === sound)?.name || 'Choose an ambience'}</b>
+              </div>
+              <button
+                className="icon-button"
+                aria-label="Toggle ambience"
+                onClick={() => setPlaying(!playing)}
+              >
+                {playing ? <Pause size={17} /> : <Play size={17} />}
+              </button>
+            </div>
+          </div>
+        </section>
+        <section className="timer-card">
+          <div className="timer-top">
+            <span className="eyebrow">POMODORO TIMER</span>
+            <span className="live-dot">{mode === 'focus' ? 'FOCUS' : 'BREAK'}</span>
+          </div>
+          <div className="mode-tabs">
+            {[
+              ['focus', 'Focus'],
+              ['short', 'Short break'],
+              ['long', 'Long break'],
+            ].map(([m, l]) => (
+              <button
+                key={m}
+                className={mode === m ? 'selected' : ''}
+                onClick={() => switchMode(m)}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+          <div className="timer-dial" style={{ '--progress': `${ratio * 100}%` }}>
+            <div className="dial-inner">
+              <span className="timer-time">
+                {mm}:{ss}
+              </span>
+              <span className="timer-label">
+                {mode === 'focus' ? 'TIME TO FOCUS' : 'TAKE A BREATHER'}
+              </span>
+            </div>
+          </div>
+          <div className="timer-controls">
+            <button
+              className="primary-button"
+              onClick={() =>
+                running
+                  ? pause()
+                  : remaining > 0 && remaining < sessionDuration * 60
+                  ? resume()
+                  : begin(mode)
+              }
+            >
+              {running ? (
+                <>
+                  <Pause size={17} /> Pause
+                </>
+              ) : (
+                <>
+                  <Play size={17} fill="currentColor" />{' '}
+                  {remaining > 0 && remaining < sessionDuration * 60 ? 'Resume' : 'Start focus'}
+                </>
+              )}
+            </button>
+            <button className="icon-button" aria-label="Reset timer" onClick={reset}>
+              <RotateCcw size={18} />
+            </button>
+            <button
+              className="icon-button"
+              aria-label="Skip session"
+              onClick={() => switchMode(mode === 'focus' ? 'short' : 'focus')}
+            >
+              <SkipForward size={18} />
+            </button>
+          </div>
+          <div className="linked-task">
+            <span className="task-check">✓</span>
+            <div>
+              <small>FOCUSING ON</small>
+              <b>{selected?.title || 'Pick a task to begin'}</b>
+            </div>
+            <Link to="/tasks" className="text-link">
+              Change
+            </Link>
+          </div>
+        </section>
+      </div>
+      <section className="below-grid">
+        <div className="surface quick-stats">
+          <div className="section-title">
+            <div>
+              <span className="eyebrow">A LITTLE PROGRESS</span>
+              <h3>Today’s rhythm</h3>
+            </div>
+            <Link to="/journal" className="text-link">
+              View journal →
+            </Link>
+          </div>
+          <div className="stat-row">
+            <div className="stat-box">
+              <span className="stat-icon peach">◷</span>
+              <b>
+                {data.journals
+                  .filter(
+                    (j) => new Date(j.created_at).toDateString() === new Date().toDateString()
+                  )
+                  .reduce((a, j) => a + (+j.duration_minutes || 25), 0)}
+                <small> min</small>
+              </b>
+              <span>focus time</span>
+            </div>
+            <div className="stat-box">
+              <span className="stat-icon mint">✦</span>
+              <b>
+                {
+                  data.journals.filter(
+                    (j) => new Date(j.created_at).toDateString() === new Date().toDateString()
+                  ).length
+                }
+              </b>
+              <span>sessions</span>
+            </div>
+            <div className="stat-box">
+              <span className="stat-icon lilac">✓</span>
+              <b>
+                {done}
+                <small> / {data.tasks.length}</small>
+              </b>
+              <span>tasks done</span>
+            </div>
+          </div>
+        </div>
+        <div className="surface task-peek">
+          <div className="section-title">
+            <div>
+              <span className="eyebrow">YOUR INTENTIONS</span>
+              <h3>Up next</h3>
+            </div>
+            <Link to="/tasks" className="round-add">
+              <Plus size={17} />
+            </Link>
+          </div>
+          {data.tasks
+            .filter((t) => !t.completed)
+            .slice(0, 3)
+            .map((t) => (
+              <button className="peek-task" key={t.id} onClick={() => setActive(t.id)}>
+                <span className={'check-circle ' + (active === t.id ? 'chosen' : '')}>
+                  {active === t.id ? '✓' : ''}
+                </span>
+                <span>{t.title}</span>
+                <small>{t.target_minutes}m</small>
+              </button>
+            ))}
+          {!data.tasks.some((t) => !t.completed) && (
+            <p className="empty-inline">All done for today ✨</p>
+          )}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function Pagination({ page, pageCount, onChange, label }) {
+  if (pageCount <= 1) return null;
+  return (
+    <nav className="pagination" aria-label={'Halaman ' + label}>
+      <button disabled={page === 1} onClick={() => onChange(page - 1)}>Sebelumnya</button>
+      <span>Halaman {page} dari {pageCount}</span>
+      <button disabled={page === pageCount} onClick={() => onChange(page + 1)}>Berikutnya</button>
+    </nav>
+  );
+}
+
+function Tasks({ data, update, begin, setActive, notify }) {
+  const [q, setQ] = useState(''),
+    [filter, setFilter] = useState('all'),
+    [page, setPage] = useState(1),
+    [form, setForm] = useState(null);
+  const nav = useNavigate();
+  const filtered = data.tasks.filter(
+    (t) =>
+      (t.title + ' ' + (t.description || '')).toLowerCase().includes(q.toLowerCase()) &&
+      (filter === 'all' || (filter === 'open' ? !t.completed : t.completed))
+  );
+  const pageSize = 8,
+    pageCount = Math.max(1, Math.ceil(filtered.length / pageSize)),
+    visibleTasks = filtered.slice((page - 1) * pageSize, page * pageSize);
+  useEffect(() => setPage(1), [q, filter]);
+  useEffect(() => { if (page > pageCount) setPage(pageCount); }, [page, pageCount]);
+
+  async function saveTask(e) {
+    e.preventDefault();
+    let t = { ...form, title: form.title.trim(), target_minutes: +form.target_minutes || 25 };
+    if (!t.title) return;
+    if (form.id) {
+      update((d) => ({ ...d, tasks: d.tasks.map((x) => (x.id === t.id ? t : x)) }));
+      api('/tasks/' + t.id, { method: 'PUT', body: JSON.stringify(t) });
+      notify('Target berhasil diperbarui.');
+    } else {
+      t = { ...t, id: crypto.randomUUID(), completed: false, created_at: new Date().toISOString() };
+      let created = await api('/tasks', { method: 'POST', body: JSON.stringify(t) });
+      if (created?.id) t.id = created.id;
+      update((d) => ({ ...d, tasks: [t, ...d.tasks] }));
+      notify('Target berhasil disimpan.');
+    }
+    setActive(t.id);
+    setForm(null);
+  }
+
+  function toggle(t) {
+    let n = { ...t, completed: !t.completed };
+    update((d) => ({ ...d, tasks: d.tasks.map((x) => (x.id === t.id ? n : x)) }));
+    api('/tasks/' + t.id, { method: 'PUT', body: JSON.stringify(n) });
+    notify(n.completed ? 'Target ditandai selesai.' : 'Target kembali dikerjakan.');
+  }
+
+  function del(t) {
+    update((d) => ({ ...d, tasks: d.tasks.filter((x) => x.id !== t.id) }));
+    api('/tasks/' + t.id, { method: 'DELETE' });
+    notify('Target berhasil dihapus.');
+  }
+
+  return (
+    <>
+      <PageHead
+        eyebrow="SMALL STEPS ADD UP"
+        title="Focus targets"
+        desc="Give your attention somewhere kind to land."
+        action={
+          <button
+            className="primary-button compact"
+            onClick={() => setForm({ title: '', description: '', priority: 'medium', target_minutes: 25 })}
+          >
+            <Plus size={16} /> New target
+          </button>
+        }
+      />
+      <div className="surface task-board">
+        <div className="task-toolbar">
+          <div className="searchbox">
+            <Search size={17} />
+            <input
+              placeholder="Find a target..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+          <div className="filter-pills">
+            {[
+              ['all', 'All'],
+              ['open', 'In progress'],
+              ['done', 'Completed'],
+            ].map(([f, l]) => (
+              <button className={filter === f ? 'active' : ''} onClick={() => setFilter(f)} key={f}>
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="progress-line">
+          <span>
+            {data.tasks.filter((t) => t.completed).length} of {data.tasks.length} intentions complete
+          </span>
+          <div>
+            <i
+              style={{
+                width:
+                  (data.tasks.length
+                    ? (data.tasks.filter((t) => t.completed).length / data.tasks.length) * 100
+                    : 0) + '%',
+              }}
+            />
+          </div>
+        </div>
+        {filtered.length ? (
+          visibleTasks.map((t) => (
+            <article className={'task-row ' + (t.completed ? 'is-done' : '')} key={t.id}>
+              <button
+                className={'check-circle large ' + (t.completed ? 'chosen' : '')}
+                onClick={() => toggle(t)}
+              >
+                {t.completed ? '✓' : ''}
+              </button>
+              <button className="task-main" onClick={() => nav('/tasks/' + t.id)}>
+                <b>{t.title}</b>
+                <span>{t.description || 'No notes yet'}</span>
+              </button>
+              <span className={'priority ' + t.priority}>{t.priority}</span>
+              <span className="duration-chip">
+                <Timer size={14} />
+                {t.target_minutes}m
+              </span>
+              <button
+                className="icon-button row-action"
+                aria-label="Edit"
+                onClick={() => setForm({ ...t })}
+              >
+                <Edit3 size={16} />
+              </button>
+              <button
+                className="icon-button row-action"
+                aria-label="Delete"
+                onClick={() => del(t)}
+              >
+                <Trash2 size={16} />
+              </button>
+              <button
+                className="start-chip"
+                onClick={() => {
+                  setActive(t.id);
+                  begin('focus', t.id);
+                  nav('/');
+                }}
+              >
+                <Play size={14} />
+              </button>
+            </article>
+          ))
+        ) : (
+          <div className="empty-state">
+            <span>🌿</span>
+            <h3>{q ? 'No matching targets' : 'A clear little slate'}</h3>
+            <p>{q ? 'Try another search.' : 'Add a focus target to make a gentle plan for today.'}</p>
+          </div>
+        )}
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} label="target" />
+      </div>
+      {form && (
+        <Modal title={form.id ? 'Edit target' : 'A new intention'} close={() => setForm(null)}>
+          <form onSubmit={saveTask} className="form-stack">
+            <label>
+              Title
+              <input
+                required
+                maxLength="120"
+                autoFocus
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                placeholder="What would you like to focus on?"
+              />
+            </label>
+            <label>
+              Notes
+              <textarea
+                rows="3"
+                value={form.description || ''}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="A little more detail..."
+              />
+            </label>
+            <div className="form-two">
+              <label>
+                Priority
+                <select
+                  value={form.priority}
+                  onChange={(e) => setForm({ ...form, priority: e.target.value })}
+                >
+                  <option>low</option>
+                  <option>medium</option>
+                  <option>high</option>
+                </select>
+              </label>
+              <label>
+                Target minutes
+                <input
+                  type="number"
+                  min="5"
+                  max="600"
+                  value={form.target_minutes}
+                  onChange={(e) => setForm({ ...form, target_minutes: e.target.value })}
+                />
+                <small className="field-hint">This sets the focus timer length for this task.</small>
+              </label>
+            </div>
+            <button className="primary-button">Save target</button>
+          </form>
+        </Modal>
+      )}
+    </>
+  );
+}
+
+function Modal({ title, close, children }) {
+  return (
+    <div
+      className="modal-shade"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) close();
+      }}
+    >
+      <div className="modal">
+        <div className="modal-head">
+          <h2>{title}</h2>
+          <button className="icon-button" onClick={close}>
+            <X size={18} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function TaskDetail({ data, update, begin, notify }) {
+  const { id } = useParams(),
+    t = data.tasks.find((x) => x.id === id),
+    nav = useNavigate();
+  if (!t)
+    return (
+      <div className="empty-state">
+        <h2>That target wandered off.</h2>
+        <Link to="/tasks">Back to targets</Link>
+      </div>
+    );
+  return (
+    <>
+      <Link to="/tasks" className="back-link">
+        <ChevronLeft size={16} /> All targets
+      </Link>
+      <PageHead
+        eyebrow="YOUR INTENTION"
+        title={t.title}
+        desc={t.description || 'A little progress, at your own pace.'}
+        action={
+          <button
+            className="primary-button compact"
+            onClick={() => {
+              begin('focus', t.id);
+              nav('/');
+            }}
+          >
+            <Play size={15} /> Start focus
+          </button>
+        }
+      />
+      <div className="surface detail-card">
+        <div className="detail-hero">✦</div>
+        <div className="detail-grid">
+          <div>
+            <small>STATUS</small>
+            <b>{t.completed ? 'Completed' : 'In progress'}</b>
+          </div>
+          <div>
+            <small>PRIORITY</small>
+            <b className={'priority ' + t.priority}>{t.priority}</b>
+          </div>
+          <div>
+            <small>TARGET FOCUS</small>
+            <b>{t.target_minutes} minutes</b>
+          </div>
+          <div>
+            <small>CREATED</small>
+            <b>{new Date(t.created_at).toLocaleDateString()}</b>
+          </div>
+        </div>
+        <div className="detail-actions">
+          <button
+            className="secondary-button"
+            onClick={() => {
+              let title = prompt('Target title', t.title);
+              if (title === null || !title.trim()) return;
+              let description = prompt('Notes', t.description || '');
+              if (description === null) return;
+              let changed = { ...t, title: title.trim(), description };
+              update((d) => ({ ...d, tasks: d.tasks.map((x) => (x.id === id ? changed : x)) }));
+              api('/tasks/' + id, { method: 'PUT', body: JSON.stringify(changed) });
+              notify('Target berhasil diperbarui.');
+            }}
+          >
+            <Edit3 size={15} /> Edit target
+          </button>
+          <button
+            className="secondary-button"
+            onClick={() => {
+              let changed = { ...t, completed: !t.completed };
+              update((d) => ({ ...d, tasks: d.tasks.map((x) => (x.id === id ? changed : x)) }));
+              api('/tasks/' + id, { method: 'PUT', body: JSON.stringify(changed) });
+              notify(changed.completed ? 'Target ditandai selesai.' : 'Target kembali dikerjakan.');
+            }}
+          >
+            {t.completed ? 'Mark in progress' : 'Mark complete'}
+          </button>
+          <button
+            className="secondary-button"
+            onClick={() => {
+              if (confirm('Delete this focus target?')) {
+                update((d) => ({ ...d, tasks: d.tasks.filter((x) => x.id !== id) }));
+                api('/tasks/' + id, { method: 'DELETE' });
+                notify('Target berhasil dihapus.');
+                nav('/tasks');
+              }
+            }}
+          >
+            <Trash2 size={16} /> Delete target
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Journal({ data }) {
+  const [q, setQ] = useState(''),
+    [date, setDate] = useState(''),
+    [page, setPage] = useState(1),
+    items = data.journals
+      .filter(
+        (j) =>
+          (!date || new Date(j.created_at).toISOString().slice(0, 10) === date) &&
+          ((j.title || '') + ' ' + (j.task_title || '') + ' ' + (j.reflection || ''))
+            .toLowerCase()
+            .includes(q.toLowerCase())
+      )
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const pageSize = 8,
+    pageCount = Math.max(1, Math.ceil(items.length / pageSize)),
+    visibleItems = items.slice((page - 1) * pageSize, page * pageSize);
+  useEffect(() => setPage(1), [q, date]);
+  useEffect(() => { if (page > pageCount) setPage(pageCount); }, [page, pageCount]);
+
+  return (
+    <>
+      <PageHead
+        eyebrow="A RECORD OF SHOWING UP"
+        title="Focus journal"
+        desc="Every focused minute is worth remembering."
+      />
+      <div className="surface journal-board">
+        <div className="searchbox journal-search">
+          <Search size={17} />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search your sessions..."
+          />
+        </div>
+        <label className="date-filter">
+          On date <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </label>
+        {items.length ? (
+          visibleItems.map((j) => (
+            <Link className="journal-entry" key={j.id} to={'/journal/' + j.id}>
+              <div className="journal-stamp">✦</div>
+              <div className="journal-copy">
+                <small>
+                  {new Date(j.created_at).toLocaleString(undefined, {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
+                </small>
+                <b>{j.title || 'Focus session'}</b>
+                <span>
+                  {j.task_title || 'Quiet focus'}
+                  {j.reflection ? ' · ' + j.reflection : ''}
+                </span>
+              </div>
+              <span className="duration-chip">
+                <Timer size={14} />
+                {j.duration_minutes || 25}m
+              </span>
+              <ChevronLeft className="journal-chevron" size={18} />
+            </Link>
+          ))
+        ) : (
+          <div className="empty-state">
+            <span>📖</span>
+            <h3>Your story starts here</h3>
+            <p>Complete a focus session and its little memory will appear here.</p>
+            <Link className="text-link" to="/">
+              Go to the focus room →
+            </Link>
+          </div>
+        )}
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} label="jurnal" />
+      </div>
+    </>
+  );
+}
+
+function JournalDetail({ data }) {
+  const { id } = useParams(),
+    [remote, setRemote] = useState(null),
+    [loading, setLoading] = useState(true);
+  const cached = data.journals.find((x) => String(x.id) === String(id));
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    api('/journals/' + encodeURIComponent(id))
+      .then((entry) => {
+        if (alive) setRemote(entry);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  const j = cached || remote;
+  if (!j && loading)
+    return (
+      <div className="empty-state">
+        <h2>Opening your session…</h2>
+      </div>
+    );
+  if (!j)
+    return (
+      <div className="empty-state">
+        <h2>Session not found.</h2>
+        <Link to="/journal">Back to journal</Link>
+      </div>
+    );
+
+  const minutes = Number(j.duration_minutes) || 25;
+  const targetTitle =
+    j.task_title ||
+    data.tasks.find((t) => String(t.id) === String(j.task_id))?.title ||
+    'Independent focus';
+  const when = new Date(j.created_at);
+
+  return (
+    <>
+      <Link to="/journal" className="back-link">
+        <ChevronLeft size={16} /> Focus journal
+      </Link>
+      <PageHead
+        eyebrow="A MOMENT YOU MADE"
+        title={j.title || 'Focus session'}
+        desc={when.toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short' })}
+      />
+      <div className="surface journal-detail">
+        <div className="journal-big-icon">📔</div>
+        <div className="journal-facts">
+          <div>
+            <small>FOCUS DURATION</small>
+            <b>{minutes} minutes</b>
+          </div>
+          <div>
+            <small>ASSOCIATED TARGET</small>
+            <b>{targetTitle}</b>
+          </div>
+          <div>
+            <small>SESSION SUMMARY</small>
+            <p>
+              You set aside {minutes} focused {minutes === 1 ? 'minute' : 'minutes'} for{' '}
+              {targetTitle.toLowerCase()}. Every completed session is a step forward.
+            </p>
+          </div>
+          <div>
+            <small>REFLECTION</small>
+            <p>{j.reflection?.trim() || 'No reflection was added for this session.'}</p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Sounds({ data, update, sound, setSound, playing, setPlaying, volume, setVolume, audio, notify }) {
+  const [c, setC] = useState('All'),
+    [busy, setBusy] = useState(false),
+    [uploadMessage, setUploadMessage] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    api('/soundtracks').then((rows) => {
+      if (!alive || !Array.isArray(rows)) return;
+      update((d) => ({ ...d, soundtracks: rows }));
+      if (sound && !rows.some((track) => track.url === sound)) {
+        setPlaying(false);
+        setSound('');
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const cats = ['All', ...new Set(data.soundtracks.map((x) => x.category))],
+    tracks = data.soundtracks.filter((s) => c === 'All' || s.category === c);
+
+  async function uploadTrack(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.mp3')) {
+      setUploadMessage('Choose an MP3 file.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      setUploadMessage('This track is over the 25 MB limit.');
+      e.target.value = '';
+      return;
+    }
+    setBusy(true);
+    setUploadMessage('Uploading your track…');
+    const title = file.name.replace(/\.mp3$/i, '').replace(/[_-]+/g, ' ').trim();
+    const query = new URLSearchParams({ filename: file.name, title });
+    try {
+      const response = await fetch(`${API}/soundtracks/upload?${query}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': file.type || 'audio/mpeg',
+          ...(readSession()?.access_token
+            ? { Authorization: 'Bearer ' + readSession().access_token }
+            : {}),
+        },
+        body: file,
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Upload failed. Check the API connection.');
+      update((d) => ({ ...d, soundtracks: [payload.data, ...d.soundtracks] }));
+      setSound(payload.data.url);
+      setPlaying(true);
+      setUploadMessage(`${payload.data.name} added to your vault.`);
+      notify('Soundtrack berhasil disimpan.');
+    } catch (error) {
+      setUploadMessage(error.message || 'Upload failed. Check your Supabase connection.');
+    } finally {
+      setBusy(false);
+      e.target.value = '';
+    }
+  }
+
+  return (
+    <>
+      <PageHead
+        eyebrow="SET THE MOOD"
+        title="Soundtrack vault"
+        desc="A soft backdrop for whatever you’re working on."
+        action={
+          <label
+            className={'primary-button compact upload-control ' + (busy ? 'disabled' : '')}
+          >
+            <Plus size={16} />
+            {busy ? 'Uploading…' : 'Add MP3'}
+            <input
+              type="file"
+              accept=".mp3,audio/mpeg"
+              onChange={uploadTrack}
+              disabled={busy}
+            />
+          </label>
+        }
+      />
+      {uploadMessage && <p className="upload-message">{uploadMessage}</p>}
+      <div className="sound-player surface">
+        <div className="record-disc">♫</div>
+        <div className="sound-playing">
+          <small>NOW PLAYING</small>
+          <h3>{data.soundtracks.find((x) => x.url === sound)?.name || 'Pick your atmosphere'}</h3>
+          <span>
+            {data.soundtracks.find((x) => x.url === sound)?.description ||
+              'A little sound can make the room feel right.'}
+          </span>
+        </div>
+        <button
+          className="play-round"
+          aria-label="Play or pause"
+          onClick={() => setPlaying(!playing)}
+        >
+          {playing ? <Pause size={20} /> : <Play size={20} fill="currentColor" />}
+        </button>
+        <label className="volume">
+          <Volume2 size={17} />
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step=".01"
+            value={volume}
+            onChange={(e) => setVolume(+e.target.value)}
+          />
+        </label>
+      </div>
+      <div className="sound-categories">
+        {cats.map((x) => (
+          <button key={x} className={c === x ? 'active' : ''} onClick={() => setC(x)}>
+            {x}
+          </button>
+        ))}
+        <span className="category-spacer" />
+        <Heart size={15} />
+        {data.soundtracks.filter((s) => s.favorite).length} saved
+      </div>
+      <div className="sound-grid">
+        {tracks.map((s, i) => (
+          <article className={'sound-card tint-' + (i % 5)} key={s.id}>
+            <button
+              className={'favorite ' + (s.favorite ? 'favorited' : '')}
+              aria-label="Toggle favorite"
+              onClick={() => {
+                let favorite = !s.favorite;
+                update((d) => ({
+                  ...d,
+                  soundtracks: d.soundtracks.map((x) => (x.id === s.id ? { ...x, favorite } : x)),
+                }));
+                api('/soundtracks/' + s.id, {
+                  method: 'PUT',
+                  body: JSON.stringify({ ...s, favorite }),
+                });
+                notify(favorite ? 'Soundtrack ditambahkan ke favorit.' : 'Soundtrack dihapus dari favorit.');
+              }}
+            >
+              <Heart size={17} fill={s.favorite ? 'currentColor' : 'none'} />
+            </button>
+            <div className="sound-art">
+              {s.category === 'Places'
+                ? '☕'
+                : s.category === 'Night'
+                ? '🌙'
+                : s.category === 'My music'
+                ? '🎧'
+                : i % 2
+                ? '🔥'
+                : '🌧️'}
+              <span className="art-stars">✦ · ✧</span>
+            </div>
+            <div className="sound-card-copy">
+              <small>{s.category.toUpperCase()}</small>
+              <h3>{s.name}</h3>
+              <p>{s.description}</p>
+              <button
+                className={'listen-button ' + (sound === s.url && playing ? 'is-playing' : '')}
+                onClick={() => {
+                  if (sound === s.url) {
+                    setPlaying(!playing);
+                  } else {
+                    setSound(s.url);
+                    setPlaying(true);
+                  }
+                }}
+              >
+                {sound === s.url && playing ? (
+                  <>
+                    <Pause size={14} /> Pause
+                  </>
+                ) : (
+                  <>
+                    <Play size={14} /> Play sound
+                  </>
+                )}
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+      <p className="audio-note">
+        <Headphones size={14} /> Add MP3 files up to 25 MB. Tracks upload to your Supabase Storage
+        vault.
+      </p>
+    </>
+  );
+}
+
+const profileAvatars = ['🌙', '🌱', '🦔', '☁️', '🐸', '🐻', '🍓', '🌼'];
+const profileFrames = [
+  ['sunny', 'Sunshine'],
+  ['sky', 'Sky'],
+  ['mint', 'Mint'],
+  ['lavender', 'Lavender'],
+  ['peach', 'Peach'],
+];
+
+function Profile({ data, update, installEvt, onLogout, notify }) {
+  const [editing, setEditing] = useState(false),
+    [draft, setDraft] = useState(null),
+    [saving, setSaving] = useState(false);
+  const profile = data.profile || {};
+  let sessions = data.journals.length,
+    minutes = data.journals.reduce((a, j) => a + (+j.duration_minutes || 25), 0),
+    tasks = data.tasks.filter((t) => t.completed).length;
+
+  function openEditor() {
+    setDraft({
+      username: profile.username || 'Little Dreamer',
+      bio: profile.bio || '',
+      avatar: profile.avatar || '🌙',
+      avatar_frame: profile.avatar_frame || 'sunny',
+    });
+    setEditing(true);
+  }
+
+  async function saveProfile(e) {
+    e.preventDefault();
+    if (!draft?.username.trim()) return;
+    setSaving(true);
+    const changed = { ...draft, username: draft.username.trim() };
+    update((d) => ({ ...d, profile: { ...d.profile, ...changed } }));
+    const saved = await api('/profile', {
+      method: 'PUT',
+      body: JSON.stringify({
+        username: changed.username,
+        bio: changed.bio,
+        avatar: changed.avatar,
+        avatar_frame: changed.avatar_frame,
+      }),
+    });
+    if (saved)
+      update((d) => ({
+        ...d,
+        profile: { ...d.profile, ...saved, avatar_frame: changed.avatar_frame },
+      }));
+    setSaving(false);
+    setEditing(false);
+    notify(saved ? 'Profil berhasil disimpan.' : 'Profil disimpan di perangkat ini.');
+  }
+
+  return (
+    <>
+      <PageHead
+        eyebrow="A LITTLE ABOUT YOU"
+        title="Your profile"
+        desc="Look how far you’ve already come."
+        action={
+          <div className="profile-head-actions">
+            <button className="secondary-button compact" onClick={onLogout}>
+              Log out
+            </button>
+            <button className="primary-button compact" onClick={openEditor}>
+              <Edit3 size={15} /> Edit profile
+            </button>
+          </div>
+        }
+      />
+      <div className="profile-layout">
+        <div className="profile-id surface">
+          <div className="id-top">
+            <span>LOFISPACE / MEMBER CARD</span>
+            <span>NO. 0001</span>
+          </div>
+          <div className={'avatar-pixel frame-' + (profile.avatar_frame || 'sunny')}>
+            {profile.avatar || '🌙'}
+          </div>
+          <div className="id-name">{profile.username || 'Little Dreamer'}</div>
+          <p className="id-bio">{profile.bio || 'Making a little progress every day.'}</p>
+          <div className="id-stats">
+            <div>
+              <b>{sessions}</b>
+              <small>SESSIONS</small>
+            </div>
+            <div>
+              <b>{(minutes / 60).toFixed(1)}</b>
+              <small>FOCUS HOURS</small>
+            </div>
+            <div>
+              <b>{tasks}</b>
+              <small>TASKS DONE</small>
+            </div>
+          </div>
+        </div>
+        <div className="profile-right">
+          <div className="surface profile-settings">
+            <span className="eyebrow">YOUR LITTLE CORNER</span>
+            <h3>About LofiSpace</h3>
+            <p>
+              LofiSpace is a cozy productivity nook for focused work, gentle breaks, and noticing
+              your progress. Make a plan, find an atmosphere, and take things one pomodoro at a
+              time.
+            </p>
+            <div className="profile-facts">
+              <span>✦&nbsp; Built for gentle focus</span>
+              <span>☁&nbsp; Your profile syncs with Supabase</span>
+              <span>♫&nbsp; Your personal music collection</span>
+            </div>
+          </div>
+          <div className="surface install-card">
+            <div className="install-icon">
+              <Download size={20} />
+            </div>
+            <div>
+              <h3>Take your nook with you</h3>
+              <p>Install LofiSpace on your device for a cozy, app-like experience.</p>
+            </div>
+            <button
+              className="secondary-button"
+              disabled={!installEvt}
+              onClick={async () => {
+                if (installEvt) {
+                  installEvt.prompt();
+                  await installEvt.userChoice;
+                }
+              }}
+            >
+              {installEvt ? 'Install app' : 'Use browser menu'}
+            </button>
+          </div>
+        </div>
+      </div>
+      {editing && (
+        <Modal title="Make it yours" close={() => setEditing(false)}>
+          <form className="form-stack profile-form" onSubmit={saveProfile}>
+            <label>
+              Display name
+              <input
+                autoFocus
+                maxLength="80"
+                required
+                value={draft.username}
+                onChange={(e) => setDraft({ ...draft, username: e.target.value })}
+                placeholder="Your name"
+              />
+            </label>
+            <label>
+              A little bio
+              <textarea
+                rows="3"
+                maxLength="500"
+                value={draft.bio}
+                onChange={(e) => setDraft({ ...draft, bio: e.target.value })}
+                placeholder="Something about you..."
+              />
+            </label>
+            <div className="picker-group">
+              <span className="picker-label">Choose your avatar</span>
+              <div className="avatar-options">
+                {profileAvatars.map((icon) => (
+                  <button
+                    type="button"
+                    key={icon}
+                    className={'avatar-option ' + (draft.avatar === icon ? 'selected' : '')}
+                    aria-label={'Choose ' + icon + ' avatar'}
+                    onClick={() => setDraft({ ...draft, avatar: icon })}
+                  >
+                    {icon}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="picker-group">
+              <span className="picker-label">Choose a picture frame</span>
+              <div className="frame-options">
+                {profileFrames.map(([frame, label]) => (
+                  <button
+                    type="button"
+                    key={frame}
+                    className={'frame-choice ' + (draft.avatar_frame === frame ? 'selected' : '')}
+                    onClick={() => setDraft({ ...draft, avatar_frame: frame })}
+                  >
+                    <span className={'frame-preview frame-' + frame}>{draft.avatar}</span>
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button className="primary-button" disabled={saving}>
+              {saving ? 'Saving…' : 'Save profile'}
+            </button>
+          </form>
+        </Modal>
+      )}
+    </>
+  );
 }
 
 export default App;
